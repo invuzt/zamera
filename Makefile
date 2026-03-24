@@ -1,60 +1,25 @@
-APP_NAME = HelloWorld
-LIB_NAME = hello
-APK_UNALIGNED = $(APP_NAME).unaligned.apk
-APK_ALIGNED = $(APP_NAME).apk
-APK_SIGNED = $(APP_NAME)-signed.apk
-
-ANDROID_HOME = $(HOME)/dev/thirdparty/android-sdk
-
-# === Files ===
-JNI_DIR = jni
-LIB_OUTPUT_DIR = libs/armeabi-v7a
-DUMMY_JAVA = Dummy.java
-DUMMY_CLASS = Dummy.class
-CLASSES_DEX = classes.dex
-
-# === Targets ===
-
-.PHONY: clean build install run
-
-clean:
-	@echo "Cleaning..."
-	ndk-build clean
-	rm -f $(DUMMY_CLASS) $(CLASSES_DEX)
-	rm -f $(APK_UNALIGNED) $(APK_ALIGNED) $(APK_SIGNED)
-	rm -rf lib
+# Perbaikan Makefile untuk GitHub Actions
+ANDROID_SDK ?= /usr/local/lib/android/sdk
+NDK_PATH ?= $(ANDROID_SDK)/ndk/26.1.10909125
+BUILD_TOOLS_VERSION := $(shell ls $(ANDROID_SDK)/build-tools | tail -n 1)
+PLATFORM_VERSION := $(shell ls $(ANDROID_SDK)/platforms | tail -n 1)
 
 build:
 	@echo "Building native code..."
-	ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=$(JNI_DIR)/Android.mk NDK_APPLICATION_MK=$(JNI_DIR)/Application.mk
-
+	$(NDK_PATH)/ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk NDK_APPLICATION_MK=jni/Application.mk
 	@echo "Compiling Dummy.java..."
-	javac $(DUMMY_JAVA)
-
+	javac Dummy.java
 	@echo "Converting to classes.dex..."
-	d8 --output . $(DUMMY_CLASS)
-
+	d8 --output . Dummy.class
 	@echo "Packaging APK..."
-	aapt package -f -M AndroidManifest.xml -S res -I $(ANDROID_HOME)/platforms/android-34/android.jar -F $(APK_UNALIGNED)
+	aapt package -f -M AndroidManifest.xml -S res -I $(ANDROID_SDK)/platforms/$(PLATFORM_VERSION)/android.jar -F HelloWorld.unaligned.apk
+	@echo "Adding libs and dex..."
+	mkdir -p lib
+	cp -r libs/* lib/
+	zip -u HelloWorld.unaligned.apk lib/*/libhello.so classes.dex
+	@echo "Aligning and Signing..."
+	zipalign -f -v 4 HelloWorld.unaligned.apk HelloWorld.apk
+	apksigner sign --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out HelloWorld-signed.apk HelloWorld.apk
 
-	@echo "Adding native library and classes.dex..."
-	mkdir -p lib/armeabi-v7a
-	cp $(LIB_OUTPUT_DIR)/lib$(LIB_NAME).so lib/armeabi-v7a/
-	zip -u $(APK_UNALIGNED) lib/armeabi-v7a/lib$(LIB_NAME).so
-	zip -u $(APK_UNALIGNED) $(CLASSES_DEX)
-
-	@echo "Aligning APK..."
-	zipalign -v 4 $(APK_UNALIGNED) $(APK_ALIGNED)
-
-	@echo "Signing APK..."
-	apksigner sign --ks my-release-key.jks --out $(APK_SIGNED) $(APK_ALIGNED)
-
-install:
-	@echo "Installing APK on device..."
-	adb install -r $(APK_SIGNED)
-
-run:
-	@echo "Launching app..."
-	@echo "Beware that this command is only valid for this particular application as the id of the application is in AndroidManifest.xml"
-	# this is relative to the AndroidManifest.xml
-	adb shell am start -n com.example.helloworld/android.app.NativeActivity
+clean:
+	rm -rf libs obj lib classes.dex Dummy.class HelloWorld.unaligned.apk HelloWorld.apk HelloWorld-signed.apk
