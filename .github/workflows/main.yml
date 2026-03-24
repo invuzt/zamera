@@ -17,7 +17,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # --- BAGIAN CACHE MULAI DI SINI ---
       - name: Cache NDK
         id: cache-ndk
         uses: actions/cache@v4
@@ -28,17 +27,26 @@ jobs:
       - name: Install NDK (Only if not cached)
         if: steps.cache-ndk.outputs.cache-hit != 'true'
         run: sdkmanager "ndk;26.1.10909125"
-      # --- BAGIAN CACHE SELESAI ---
 
       - name: Build APK
         run: |
+          # 1. Setup Path NDK
           export NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125
-          export PATH=$NDK_HOME:$PATH
           
-          # Buat keystore debug
+          # 2. Setup Path Build-Tools (untuk aapt, d8, zipalign)
+          BUILD_TOOLS_VERSION=$(ls $ANDROID_SDK_ROOT/build-tools | tail -n 1)
+          export BUILD_TOOLS_PATH=$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION
+          
+          # 3. Masukkan semua ke PATH
+          export PATH=$NDK_HOME:$BUILD_TOOLS_PATH:$PATH
+          
+          echo "Using Build Tools: $BUILD_TOOLS_PATH"
+          
+          # 4. Buat keystore debug
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           
-          make build NDK_PATH=$NDK_HOME
+          # 5. Jalankan build dengan menyuntikkan path SDK yang benar ke Makefile
+          make build ANDROID_SDK=$ANDROID_SDK_ROOT
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
 
