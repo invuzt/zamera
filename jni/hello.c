@@ -3,62 +3,67 @@
 #include <EGL/egl.h>
 #include <android_native_app_glue.h>
 
+// Jembatan ke Rust
 extern float get_rust_status();
+extern float get_rust_color_r(float t);
+extern float get_rust_color_g(float t);
 
 struct engine {
     struct android_app* app;
     EGLDisplay display;
     EGLSurface surface;
     EGLContext context;
+    float tick;
 };
 
-static int engine_init_display(struct engine* engine) {
-    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    eglInitialize(display, 0, 0);
-    const EGLint attribs[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8, EGL_NONE };
-    EGLConfig config; EGLint numConfigs;
-    eglChooseConfig(display, attribs, &config, 1, &numConfigs);
-    EGLSurface surface = eglCreateWindowSurface(display, config, engine->app->window, NULL);
-    EGLContext context = eglCreateContext(display, config, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
-    eglMakeCurrent(display, surface, surface, context);
-    engine->display = display; engine->surface = surface; engine->context = context;
+static int init_display(struct engine* eng) {
+    EGLDisplay disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    eglInitialize(disp, 0, 0);
+    const EGLint attr[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8, EGL_NONE };
+    EGLConfig cfg; EGLint n;
+    eglChooseConfig(disp, attr, &cfg, 1, &n);
+    EGLSurface surf = eglCreateWindowSurface(disp, cfg, eng->app->window, NULL);
+    EGLContext ctx = eglCreateContext(disp, cfg, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
+    eglMakeCurrent(disp, surf, surf, ctx);
+    eng->display = disp; eng->surface = surf; eng->context = ctx;
     return 0;
 }
 
-static void engine_draw_frame(struct engine* engine) {
-    if (engine->display == NULL) return;
+static void draw_frame(struct engine* eng) {
+    if (eng->display == NULL) return;
     
-    // TANYA RUST
-    if (get_rust_status() > 0.5f) {
-        glClearColor(0.0f, 1.0f, 0.0f, 1.0f); // HIJAU MANTAP
-    } else {
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f); // MERAH GAGAL
-    }
+    // Ambil warna dinamis dari Otak Rust
+    float r = get_rust_color_r(eng->tick);
+    float g = get_rust_color_g(eng->tick);
+    
+    glClearColor(r, g, 0.5f, 1.0f); 
     glClear(GL_COLOR_BUFFER_BIT);
-    eglSwapBuffers(engine->display, engine->surface);
+    eglSwapBuffers(eng->display, eng->surface);
+    eng->tick += 0.02f;
 }
 
-static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
-    struct engine* engine = (struct engine*)app->userData;
+static void handle_cmd(struct android_app* app, int32_t cmd) {
+    struct engine* eng = (struct engine*)app->userData;
     if (cmd == APP_CMD_INIT_WINDOW) {
-        engine_init_display(engine);
-        engine_draw_frame(engine);
+        init_display(eng);
+    } else if (cmd == APP_CMD_TERM_WINDOW) {
+        eng->display = NULL; // Stop drawing
     }
 }
 
 void android_main(struct android_app* state) {
-    struct engine engine = {0};
-    state->userData = &engine;
-    state->onAppCmd = engine_handle_cmd;
-    engine.app = state;
+    struct engine eng = {0};
+    state->userData = &eng;
+    state->onAppCmd = handle_cmd;
+    eng.app = state;
 
     while (1) {
-        int ident, events;
-        struct android_poll_source* source;
-        while ((ident=ALooper_pollOnce(0, NULL, &events, (void**)&source)) >= 0) {
-            if (source != NULL) source->process(state, source);
+        int id, ev;
+        struct android_poll_source* src;
+        while ((id = ALooper_pollOnce(0, NULL, &ev, (void**)&src)) >= 0) {
+            if (src != NULL) src->process(state, src);
             if (state->destroyRequested != 0) return;
         }
-        if (engine.display != NULL) engine_draw_frame(&engine);
+        if (eng.display != NULL) draw_frame(&eng);
     }
 }
