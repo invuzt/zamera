@@ -1,8 +1,5 @@
-name: Build Zamera APK
-on: 
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+name: Build Zamera Hybrid (C + Rust)
+on: [push]
 
 jobs:
   build:
@@ -10,18 +7,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Build Rust Logic
+        run: |
+          cd rust_logic
+          # Kita pakai cargo-ndk atau set target manual
+          rustup target add aarch64-linux-android
+          cargo build --target aarch64-linux-android --release
+          # Pindahkan hasil build ke folder jni agar bisa di-link oleh C
+          cp target/aarch64-linux-android/release/libzamera_core.a ../jni/
+
       - name: Generate Debug Keystore
         run: |
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Zamera, OU=Dev, O=Zamera, L=Ponorogo, S=EastJava, C=ID"
 
-      - name: Build Project
+      - name: Build Final APK (C linking Rust)
         run: |
           NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* | head -n 1)
-          # Paksa Makefile menggunakan nama zamera
+          # Tambahkan flag linker untuk menyertakan library Rust (.a)
+          export LDFLAGS="-L./jni -lzamera_core"
           make NDK_PATH=$NDK_PATH
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zamera-Release
+          name: Zamera-Hybrid-Release
           path: "zamera-final.apk"

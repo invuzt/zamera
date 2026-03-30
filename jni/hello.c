@@ -1,3 +1,5 @@
+extern float get_rust_rotation(float t);
+extern unsigned int get_rust_color();
 #include <android_native_app_glue.h>
 #include <android/log.h>
 #include <android/native_window.h>
