@@ -3,40 +3,32 @@
 #include <EGL/egl.h>
 #include <android_native_app_glue.h>
 
-// Jembatan ke Rust
-extern float get_rust_status();
+extern void set_rust_touch(float x, float y);
 extern float get_rust_color_r(float t);
 extern float get_rust_color_g(float t);
 
 struct engine {
     struct android_app* app;
-    EGLDisplay display;
-    EGLSurface surface;
-    EGLContext context;
+    EGLDisplay display; EGLSurface surface;
     float tick;
 };
 
-static int init_display(struct engine* eng) {
-    EGLDisplay disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    eglInitialize(disp, 0, 0);
-    const EGLint attr[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8, EGL_NONE };
-    EGLConfig cfg; EGLint n;
-    eglChooseConfig(disp, attr, &cfg, 1, &n);
-    EGLSurface surf = eglCreateWindowSurface(disp, cfg, eng->app->window, NULL);
-    EGLContext ctx = eglCreateContext(disp, cfg, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
-    eglMakeCurrent(disp, surf, surf, ctx);
-    eng->display = disp; eng->surface = surf; eng->context = ctx;
+// Fungsi untuk menangkap sentuhan jari
+static int32_t handle_input(struct android_app* app, AInputEvent* event) {
+    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
+        float x = AMotionEvent_getX(event, 0) / 1080.0f; // Normalisasi ke 0.0 - 1.0
+        float y = AMotionEvent_getY(event, 0) / 2400.0f;
+        set_rust_touch(x, y);
+        return 1;
+    }
     return 0;
 }
 
 static void draw_frame(struct engine* eng) {
     if (eng->display == NULL) return;
-    
-    // Ambil warna dinamis dari Otak Rust
     float r = get_rust_color_r(eng->tick);
     float g = get_rust_color_g(eng->tick);
-    
-    glClearColor(r, g, 0.5f, 1.0f); 
+    glClearColor(r, g, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     eglSwapBuffers(eng->display, eng->surface);
     eng->tick += 0.02f;
@@ -45,9 +37,15 @@ static void draw_frame(struct engine* eng) {
 static void handle_cmd(struct android_app* app, int32_t cmd) {
     struct engine* eng = (struct engine*)app->userData;
     if (cmd == APP_CMD_INIT_WINDOW) {
-        init_display(eng);
-    } else if (cmd == APP_CMD_TERM_WINDOW) {
-        eng->display = NULL; // Stop drawing
+        EGLDisplay disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+        eglInitialize(disp, 0, 0);
+        const EGLint attr[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8, EGL_NONE };
+        EGLConfig cfg; EGLint n;
+        eglChooseConfig(disp, attr, &cfg, 1, &n);
+        eng->surface = eglCreateWindowSurface(disp, cfg, app->window, NULL);
+        eng->display = disp;
+        EGLContext ctx = eglCreateContext(disp, cfg, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
+        eglMakeCurrent(disp, eng->surface, eng->surface, ctx);
     }
 }
 
@@ -55,6 +53,7 @@ void android_main(struct android_app* state) {
     struct engine eng = {0};
     state->userData = &eng;
     state->onAppCmd = handle_cmd;
+    state->onInputEvent = handle_input; // PASANG DETEKTOR SENTUHAN
     eng.app = state;
 
     while (1) {
