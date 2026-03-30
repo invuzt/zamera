@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.odfiz.micro">
+    package="com.odfiz.zamera">
 
 <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
 
-<application android:label="OdfizMicro">
+<application android:label="Zamera">
     <activity
         android:name="android.app.NativeActivity"
-        android:label="OdfizMicro"
+        android:label="Zamera"
         android:exported="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
         android:screenOrientation="landscape"

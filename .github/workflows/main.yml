@@ -1,4 +1,4 @@
-name: Build C Ultra Micro APK
+name: Build Zamera APK
 on: 
   push:
     branches: [ main ]
@@ -12,25 +12,16 @@ jobs:
 
       - name: Generate Debug Keystore
         run: |
-          # Bikin keystore darurat biar apksigner gak marah
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Odfiz, OU=Dev, O=Odfiz, L=Ponorogo, S=EastJava, C=ID"
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Zamera, OU=Dev, O=Zamera, L=Ponorogo, S=EastJava, C=ID"
 
       - name: Build Project
         run: |
           NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* | head -n 1)
-          echo "Menggunakan NDK di: $NDK_PATH"
-          
-          if [ -f "./build.sh" ]; then
-            chmod +x build.sh
-            sed -i "s|/usr/local/lib/android/sdk/ndk/[^/]*|$NDK_PATH|g" build.sh
-            ./build.sh
-          else
-            # Tambahkan flag NDK_PATH jika Makefile membutuhkannya
-            make NDK_PATH=$NDK_PATH
-          fi
+          # Paksa Makefile menggunakan nama zamera
+          make NDK_PATH=$NDK_PATH
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ultra-micro-release
-          path: "*.apk"
+          name: Zamera-Release
+          path: "zamera-final.apk"

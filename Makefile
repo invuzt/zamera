@@ -27,13 +27,13 @@ build:
 	zip -u HelloWorld.unaligned.apk lib/*/libhello.so classes.dex
 	
 	@echo "Aligning..."
-	$(ZIPALIGN) -f 4 HelloWorld.unaligned.apk HelloWorld.apk
+	$(ZIPALIGN) -f 4 HelloWorld.unaligned.apk zamera.apk
 	
 	@echo "Signing..."
-	$(APKSIGNER) sign --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out Odfiz-signed.apk HelloWorld.apk
+	$(APKSIGNER) sign --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out zamera-final.apk zamera.apk
 	
 	@echo "Cleaning up..."
-	rm -rf libs obj lib classes.dex Dummy.class HelloWorld.unaligned.apk HelloWorld.apk debug.keystore
+	rm -rf libs obj lib classes.dex Dummy.class HelloWorld.unaligned.apk zamera.apk debug.keystore
 
 clean:
 	rm -rf libs obj lib classes.dex Dummy.class *.apk
