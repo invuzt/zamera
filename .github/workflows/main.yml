@@ -10,19 +10,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Generate Debug Keystore
+        run: |
+          # Bikin keystore darurat biar apksigner gak marah
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Odfiz, OU=Dev, O=Odfiz, L=Ponorogo, S=EastJava, C=ID"
+
       - name: Build Project
         run: |
-          # Cari folder NDK yang ada secara otomatis
           NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* | head -n 1)
           echo "Menggunakan NDK di: $NDK_PATH"
           
-          # Jalankan build dengan memaksa jalur NDK yang ditemukan
           if [ -f "./build.sh" ]; then
             chmod +x build.sh
-            # Kita timpa variabel NDK di dalam script jika perlu
             sed -i "s|/usr/local/lib/android/sdk/ndk/[^/]*|$NDK_PATH|g" build.sh
             ./build.sh
           else
+            # Tambahkan flag NDK_PATH jika Makefile membutuhkannya
             make NDK_PATH=$NDK_PATH
           fi
 
@@ -30,4 +33,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ultra-micro-release
-          path: "**/*.apk"
+          path: "*.apk"
