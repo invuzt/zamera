@@ -6,23 +6,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
-      - name: Build Rust Static Lib
+      - name: Build Rust Logic
         run: |
           cd rust_logic
           cargo build --target aarch64-linux-android --release
           cp target/aarch64-linux-android/release/libzamera_core.a ../jni/
 
-      - name: Build APK
+      - name: Generate Debug Keystore
+        run: |
+          # JANGAN SAMPAI LEWAT: Bikin kunci buat tanda tangan APK
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Zamera, OU=Dev, O=Zamera, L=Ponorogo, S=EastJava, C=ID"
+
+      - name: Build Final APK
         run: |
           NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* | head -n 1)
+          # Makefile akan memanggil apksigner yang butuh debug.keystore tadi
           make NDK_PATH=$NDK_PATH
           
-      - name: Upload
+      - name: Upload Zamera APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zamera-Test
-          path: "*.apk"
+          name: Zamera-Hybrid-Final
+          path: "zamera-final.apk"
