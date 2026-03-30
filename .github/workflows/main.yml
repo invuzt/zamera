@@ -10,18 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup NDK
-        run: |
-          # Menggunakan NDK default di GitHub Runner
-          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk-bundle" >> $GITHUB_ENV
-
       - name: Build Project
         run: |
+          # Cari folder NDK yang ada secara otomatis
+          NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* | head -n 1)
+          echo "Menggunakan NDK di: $NDK_PATH"
+          
+          # Jalankan build dengan memaksa jalur NDK yang ditemukan
           if [ -f "./build.sh" ]; then
             chmod +x build.sh
+            # Kita timpa variabel NDK di dalam script jika perlu
+            sed -i "s|/usr/local/lib/android/sdk/ndk/[^/]*|$NDK_PATH|g" build.sh
             ./build.sh
           else
-            make
+            make NDK_PATH=$NDK_PATH
           fi
 
       - name: Upload APK
