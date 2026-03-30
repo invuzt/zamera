@@ -1,5 +1,11 @@
 name: Build C Ultra Micro APK
-on: [push]
+on: 
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -12,14 +18,18 @@ jobs:
         with:
           ndk-version: r25b
 
-      - name: Build with Make
+      - name: Build Project
         run: |
-          # Jalankan perintah build sesuai instruksi repo ultra-micro-apk
-          # Biasanya cukup menjalankan script build yang ada di sana
-          chmod +x build.sh && ./build.sh || make
+          # Coba jalankan build.sh jika ada, jika tidak pakai make
+          if [ -f "./build.sh" ]; then
+            chmod +x build.sh
+            ./build.sh
+          else
+            make
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ultra-micro-release
-          path: "*.apk"
+          path: "**/*.apk"
