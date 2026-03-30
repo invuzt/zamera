@@ -10,17 +10,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build with Native NDK
+      - name: Setup NDK
         run: |
-          # GitHub Runner sudah punya NDK di folder ini:
-          export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk-bundle
-          
+          # Menggunakan NDK default di GitHub Runner
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk-bundle" >> $GITHUB_ENV
+
+      - name: Build Project
+        run: |
           if [ -f "./build.sh" ]; then
             chmod +x build.sh
             ./build.sh
           else
-            # Jika tidak ada build.sh, kita coba jalankan make dengan NDK path
-            make NDK=$ANDROID_NDK_HOME
+            make
           fi
 
       - name: Upload APK
