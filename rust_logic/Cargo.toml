@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "zamera_core"
-crate-type = ["staticlib"] # Kita buat static agar menyatu dengan C
+crate-type = ["staticlib"]
 
 [dependencies]
-# Tanpa dependencies berat dulu agar build cepat
+sha2 = "0.10" # Library standar untuk SHA-256

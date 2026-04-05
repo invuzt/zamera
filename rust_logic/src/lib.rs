@@ -1,22 +1,29 @@
-use std::os::raw::c_float;
+use sha2::{Sha256, Digest};
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
 
-static mut TOUCH_X: f32 = 0.5;
-static mut TOUCH_Y: f32 = 0.5;
+static mut NONCE: u64 = 0;
+static mut LAST_HASH: String = String::new();
 
 #[no_mangle]
-pub extern "C" fn set_rust_touch(x: c_float, y: c_float) {
+pub extern "C" fn rust_mining_tick() -> *mut c_char {
     unsafe {
-        TOUCH_X = x;
-        TOUCH_Y = y;
+        let mut hasher = Sha256::new();
+        let data = format!("OdfizBlock-{}", NONCE);
+        hasher.update(data.as_bytes());
+        let result = hasher.finalize();
+        
+        let hash_str = format!("{:x}", result);
+        LAST_HASH = hash_str.clone();
+        NONCE += 1;
+
+        // Kirim string hash ke C untuk ditampilkan
+        let c_str = CString::new(hash_str).unwrap();
+        c_str.into_raw()
     }
 }
 
 #[no_mangle]
-pub extern "C" fn get_rust_color_r(t: c_float) -> c_float {
-    unsafe { (t * (TOUCH_X * 5.0)).sin().abs() }
-}
-
-#[no_mangle]
-pub extern "C" fn get_rust_color_g(t: c_float) -> c_float {
-    unsafe { (t * (TOUCH_Y * 5.0)).cos().abs() }
+pub extern "C" fn get_nonce() -> c_int {
+    unsafe { NONCE as c_int }
 }

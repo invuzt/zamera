@@ -1,0 +1,19 @@
+# Keystore / Sign key (SANGAT PENTING)
+*.jks
+*.keystore
+
+# Hasil build & temporary files
+bin/
+gen/
+obj/
+libs/
+
+# Screenshot atau image testing
+*.jpg
+*.png
+
+# File sistem atau IDE
+.DS_Store
+.idea/
+*.swp
+
