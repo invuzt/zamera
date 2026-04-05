@@ -2,33 +2,46 @@
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 #include <android_native_app_glue.h>
-#include <android/log.h>
 #include <stdlib.h>
+#include <math.h>
 
-extern char* rust_mining_tick();
+extern float rust_mining_next_val();
 extern int get_nonce();
 
 struct engine {
     struct android_app* app;
-    EGLDisplay display; 
-    EGLSurface surface;
-    EGLContext context;
+    EGLDisplay display; EGLSurface surface; EGLContext context;
+    int width, height;
 };
 
 static void draw_frame(struct engine* eng) {
     if (eng->display == EGL_NO_DISPLAY) return;
 
-    char* current_hash = rust_mining_tick();
+    // Ambil "Hash Power" dari Rust
+    float val = rust_mining_next_val();
     int nonce = get_nonce();
 
-    __android_log_print(ANDROID_LOG_INFO, "BITCOIN_SIM", "Block #%d | Hash: %s", nonce, current_hash);
-
-    float r = (float)(nonce % 100) / 100.0f;
-    glClearColor(0.0f, r * 0.2f, 0.0f, 1.0f);
+    // Background Hitam khas Terminal
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // Aktifkan Scissor Test untuk menggambar "Bar Data" Mining
+    glEnable(GL_SCISSOR_TEST);
+    
+    // Kita gambar 20 baris data simulasi berdasarkan Hash
+    for(int i = 0; i < 20; i++) {
+        float speed = (float)(i + 1) * val;
+        int x_pos = (nonce + (i * 50)) % eng->width;
+        int y_pos = (i * (eng->height / 20));
+        
+        // Warna Hijau Matrix yang bervariasi sesuai Hash
+        glScissor(x_pos, y_pos, 100 * val, 20); 
+        glClearColor(0.0f, val, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+    
+    glDisable(GL_SCISSOR_TEST);
     eglSwapBuffers(eng->display, eng->surface);
-    free(current_hash);
 }
 
 static void handle_cmd(struct android_app* app, int32_t cmd) {
@@ -36,20 +49,16 @@ static void handle_cmd(struct android_app* app, int32_t cmd) {
     if (cmd == APP_CMD_INIT_WINDOW) {
         eng->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
         eglInitialize(eng->display, NULL, NULL);
-        
-        const EGLint attr[] = { 
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, 
-            EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8, 
-            EGL_NONE 
-        };
-        
-        EGLConfig cfg; 
-        EGLint n;
+        const EGLint attr[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_BLUE_SIZE, 8, EGL_NONE };
+        EGLConfig cfg; EGLint n;
         eglChooseConfig(eng->display, attr, &cfg, 1, &n);
         eng->surface = eglCreateWindowSurface(eng->display, cfg, app->window, NULL);
-        eng->context = eglCreateContext(eng->display, cfg, EGL_NO_CONTEXT, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
-        
+        eng->context = eglCreateContext(eng->display, cfg, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
         eglMakeCurrent(eng->display, eng->surface, eng->surface, eng->context);
+        
+        // Ambil ukuran layar untuk kalkulasi posisi visual
+        eng->width = ANativeWindow_getWidth(app->window);
+        eng->height = ANativeWindow_getHeight(app->window);
     }
 }
 
@@ -57,7 +66,6 @@ void android_main(struct android_app* state) {
     struct engine eng = {0};
     state->userData = &eng;
     state->onAppCmd = handle_cmd;
-    
     while (1) {
         int id, ev;
         struct android_poll_source* src;
