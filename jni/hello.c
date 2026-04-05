@@ -2,68 +2,56 @@
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 #include <android_native_app_glue.h>
-#include <android/log.h>
-#include <stdio.h>
 
 extern float rust_mining_next_val();
-extern float get_hashrate();
-extern int get_nonce();
+extern float get_hashrate_pct();
 
 struct engine {
     struct android_app* app;
-    EGLDisplay display; EGLSurface surface;
+    EGLDisplay display; EGLSurface surface; EGLContext context;
     int width, height;
-    int frame_count;
 };
-
-// Fungsi sakti untuk memunculkan Toast dari Native C
-void show_toast(struct android_app* app, const char* message) {
-    JNIEnv* env;
-    (*app->activity->vm)->AttachCurrentThread(app->activity->vm, &env, NULL);
-
-    jclass toast_class = (*env)->FindClass(env, "android/widget/Toast");
-    jmethodID make_text = (*env)->GetStaticMethodID(env, toast_class, "makeText", 
-        "(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;");
-    
-    jstring jmsg = (*env)->NewStringUTF(env, message);
-    jobject toast_obj = (*env)->CallStaticObjectMethod(env, toast_class, make_text, 
-        app->activity->clazz, jmsg, 0); // 0 = Toast.LENGTH_SHORT
-
-    jmethodID show = (*env)->GetMethodID(env, toast_class, "show", "()V");
-    (*env)->CallVoidMethod(env, toast_obj, show);
-
-    (*app->activity->vm)->DetachCurrentThread(app->activity->vm);
-}
 
 static void draw_frame(struct engine* eng) {
     if (eng->display == EGL_NO_DISPLAY) return;
 
-    float val = rust_mining_next_val();
-    eng->frame_count++;
+    float hash_val = rust_mining_next_val();
+    float rate_pct = get_hashrate_pct();
 
-    // Munculkan Hashrate di layar setiap 120 frame (sekitar 2 detik)
-    if (eng->frame_count % 120 == 0) {
-        char msg[64];
-        sprintf(msg, "Zamera Miner: %.2f MH/s", get_hashrate());
-        show_toast(eng->app, msg);
-        __android_log_print(ANDROID_LOG_INFO, "MINER", "%s", msg);
-    }
-
+    // 1. Bersihkan layar (Background Hitam)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Visual Matrix Rain tetap jalan
     glEnable(GL_SCISSOR_TEST);
-    int num_cols = 30;
-    for(int i=0; i<num_cols; i++) {
-        int x = i * (eng->width/num_cols);
-        int y = (int)(eng->height * val + (i*10)) % eng->height;
-        glScissor(x, y, (eng->width/num_cols)-2, 40);
-        glClearColor(0.0f, val, 0.0f, 1.0f);
+
+    // 2. GAMBAR HASHRATE BAR (DI ATAS)
+    // Tinggi bar 30 pixel, panjang sesuai rate_pct
+    int bar_height = 40;
+    int bar_width = (int)(eng->width * rate_pct);
+    
+    // Background bar (Abu-abu gelap)
+    glScissor(0, eng->height - bar_height, eng->width, bar_height);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Isi bar (Hijau Neon / Glow)
+    if (bar_width > 0) {
+        glScissor(0, eng->height - bar_height, bar_width, bar_height);
+        glClearColor(0.0f, 1.0f, 0.5f, 1.0f); // Hijau Cyan
         glClear(GL_COLOR_BUFFER_BIT);
     }
-    glDisable(GL_SCISSOR_TEST);
 
+    // 3. VISUAL MATRIX RAIN (DI BAWAH BAR)
+    int num_cols = 25;
+    int col_w = eng->width / num_cols;
+    for(int i=0; i<num_cols; i++) {
+        int y = (int)((eng->height - bar_height) * hash_val + (i * 20)) % (eng->height - bar_height);
+        glScissor(i * col_w, y, col_w - 2, 30);
+        glClearColor(0.0f, hash_val * 0.7f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
+    glDisable(GL_SCISSOR_TEST);
     eglSwapBuffers(eng->display, eng->surface);
 }
 
@@ -76,8 +64,8 @@ static void handle_cmd(struct android_app* app, int32_t cmd) {
         EGLConfig cfg; EGLint n;
         eglChooseConfig(eng->display, attr, &cfg, 1, &n);
         eng->surface = eglCreateWindowSurface(eng->display, cfg, app->window, NULL);
-        EGLContext ctx = eglCreateContext(eng->display, cfg, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
-        eglMakeCurrent(eng->display, eng->surface, eng->surface, ctx);
+        eng->context = eglCreateContext(eng->display, cfg, NULL, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
+        eglMakeCurrent(eng->display, eng->surface, eng->surface, eng->context);
         eng->width = ANativeWindow_getWidth(app->window);
         eng->height = ANativeWindow_getHeight(app->window);
     }
