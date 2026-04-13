@@ -1,4 +1,4 @@
-name: Build Zamera Hybrid
+name: Build Zamera Pure Rust
 on: [push]
 
 jobs:
@@ -6,31 +6,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install Rust
+
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
-      - name: Build Rust Logic
+      - name: Build Shared Library
         run: |
-          cd rust_logic
           cargo build --target aarch64-linux-android --release
-          cp target/aarch64-linux-android/release/libzamera_core.a ../jni/
-
-      - name: Generate Debug Keystore
-        run: |
-          # JANGAN SAMPAI LEWAT: Bikin kunci buat tanda tangan APK
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Zamera, OU=Dev, O=Zamera, L=Ponorogo, S=EastJava, C=ID"
-
-      - name: Build Final APK
-        run: |
-          NDK_PATH=$(ls -d $ANDROID_SDK_ROOT/ndk/* | head -n 1)
-          # Makefile akan memanggil apksigner yang butuh debug.keystore tadi
-          make NDK_PATH=$NDK_PATH
           
-      - name: Upload Zamera APK
+      - name: Package APK (Manual minimal)
+        run: |
+          # Ambil .so hasil build Rust
+          mkdir -p lib/arm64-v8a
+          cp target/aarch64-linux-android/release/libzamera.so lib/arm64-v8a/libhello.so
+          
+          # Buat APK kosongan (Hanya untuk contoh, biasanya pakai cargo-apk)
+          # Tetap pakai aapt untuk membungkus manifest dan lib
+          aapt package -f -M AndroidManifest.xml -S res -I $ANDROID_SDK_ROOT/platforms/android-34/android.jar -F zamera-unsigned.apk
+          zip -u zamera-unsigned.apk lib/arm64-v8a/libhello.so
+          
+          # Signing
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Odfiz, L=Ponorogo"
+          apksigner sign --ks debug.keystore --ks-pass pass:android --out zamera-final.apk zamera-unsigned.apk
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zamera-Hybrid-Final
+          name: Zamera-PureRust-APK
           path: "zamera-final.apk"

@@ -23,7 +23,7 @@ build:
 	$(AAPT) package -f -M AndroidManifest.xml -S res -I $(PLATFORM_JAR) -F HelloWorld.unaligned.apk
 	
 	@echo "Adding libs and dex..."
-	mkdir -p lib && cp -r libs/* lib/
+	mkdir -p lib && 
 	zip -u HelloWorld.unaligned.apk lib/*/libhello.so classes.dex
 	
 	@echo "Aligning..."
