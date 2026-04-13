@@ -14,16 +14,16 @@ jobs:
 
       - name: Build Shared Library
         run: |
-          # 1. Lokasi NDK di Runner GitHub
+          # 1. Cari lokasi NDK di Runner
           ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk-bundle
           if [ ! -d "$ANDROID_NDK_HOME" ]; then
             ANDROID_NDK_HOME=$(ls -d $ANDROID_SDK_ROOT/ndk/* | tail -1)
           fi
           
-          # 2. Path Toolchain Linux
+          # 2. Setup Toolchain Linker
           TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           
-          # 3. EXPORT LINKER (Solusi Error EM: 183)
+          # 3. Paksa Linker NDK (Solusi EM: 183)
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TOOLCHAIN/bin/aarch64-linux-android34-clang
           export CC_aarch64_linux_android=$TOOLCHAIN/bin/aarch64-linux-android34-clang
           export AR_aarch64_linux_android=$TOOLCHAIN/bin/llvm-ar
@@ -32,17 +32,20 @@ jobs:
           
       - name: Package APK
         run: |
+          # Cari lokasi build-tools (aapt & apksigner)
+          BUILD_TOOLS_PATH=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | tail -1)
+          
+          # Persiapkan folder lib
           mkdir -p lib/arm64-v8a
-          # Ambil hasil lib Rust, ganti nama jadi libhello sesuai manifest
           cp target/aarch64-linux-android/release/libzamera.so lib/arm64-v8a/libhello.so
           
-          # Packing menggunakan aapt
-          aapt package -f -M AndroidManifest.xml -S res -I $ANDROID_SDK_ROOT/platforms/android-34/android.jar -F zamera-unsigned.apk
+          # Packing (Gunakan path lengkap agar tidak command not found)
+          $BUILD_TOOLS_PATH/aapt package -f -M AndroidManifest.xml -S res -I $ANDROID_SDK_ROOT/platforms/android-34/android.jar -F zamera-unsigned.apk
           zip -u zamera-unsigned.apk lib/arm64-v8a/libhello.so
           
           # Signing
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Odfiz, L=Ponorogo"
-          apksigner sign --ks debug.keystore --ks-pass pass:android --out zamera-final.apk zamera-unsigned.apk
+          $BUILD_TOOLS_PATH/apksigner sign --ks debug.keystore --ks-pass pass:android --out zamera-final.apk zamera-unsigned.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
