@@ -14,16 +14,29 @@ jobs:
 
       - name: Build Shared Library
         run: |
+          # 1. Lokasi NDK di Runner GitHub
+          ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk-bundle
+          if [ ! -d "$ANDROID_NDK_HOME" ]; then
+            ANDROID_NDK_HOME=$(ls -d $ANDROID_SDK_ROOT/ndk/* | tail -1)
+          fi
+          
+          # 2. Path Toolchain Linux
+          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          
+          # 3. EXPORT LINKER (Solusi Error EM: 183)
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TOOLCHAIN/bin/aarch64-linux-android34-clang
+          export CC_aarch64_linux_android=$TOOLCHAIN/bin/aarch64-linux-android34-clang
+          export AR_aarch64_linux_android=$TOOLCHAIN/bin/llvm-ar
+          
           cargo build --target aarch64-linux-android --release
           
-      - name: Package APK (Manual minimal)
+      - name: Package APK
         run: |
-          # Ambil .so hasil build Rust
           mkdir -p lib/arm64-v8a
+          # Ambil hasil lib Rust, ganti nama jadi libhello sesuai manifest
           cp target/aarch64-linux-android/release/libzamera.so lib/arm64-v8a/libhello.so
           
-          # Buat APK kosongan (Hanya untuk contoh, biasanya pakai cargo-apk)
-          # Tetap pakai aapt untuk membungkus manifest dan lib
+          # Packing menggunakan aapt
           aapt package -f -M AndroidManifest.xml -S res -I $ANDROID_SDK_ROOT/platforms/android-34/android.jar -F zamera-unsigned.apk
           zip -u zamera-unsigned.apk lib/arm64-v8a/libhello.so
           
